@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navimod - ETF Strategy Hub</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            background-color: #020617;
+            background-image: 
+                radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.05) 0, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.05) 0, transparent 50%);
+            font-family: system-ui, -apple-system, sans-serif;
+            color: #e2e8f0;
+            margin: 0;
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.4);
+        }
+
+        .strategy-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .risk-conservative { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .risk-moderate { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .risk-balanced { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+        .risk-growth { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+        .risk-aggressive { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+        .param-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(71, 85, 105, 0.3);
+            border-radius: 4px;
+            color: #94a3b8;
+        }
+
+        .stat-pill {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(71, 85, 105, 0.3);
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-animate {
+            animation: fadeIn 0.2s ease-out;
+        }
+    </style>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- ICONS ---
+        const Icons = {
+            TrendingUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+            Shield: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+            Zap: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+            Target: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+            Umbrella: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/></svg>,
+            Layers: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+            Flame: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+            BarChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>,
+            PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+        };
+
+        // --- 7 STRATEGIES DEFINITION ---
+        const STRATEGIES = [
+            {
+                id: 1,
+                name: "Balanced Momentum",
+                subtitle: "Core allocation with tactical edge",
+                icon: "Target",
+                color: "#eab308",
+                riskClass: "risk-balanced",
+                riskLabel: "Balanced",
+                params: { lookback: '3M', rebalance: '1W', risk: 3 },
+                description: "Captures medium-term trends while maintaining diversification. Ideal for investors seeking steady growth with controlled volatility.",
+                logic: "Uses 3-month rolling window to estimate asset correlations. Weekly rebalancing captures momentum shifts without excessive turnover."
+            },
+            {
+                id: 2,
+                name: "Aggressive Tech Rotation",
+                subtitle: "High-conviction sector plays",
+                icon: "Flame",
+                color: "#ef4444",
+                riskClass: "risk-aggressive",
+                riskLabel: "Aggressive",
+                params: { lookback: '1M', rebalance: '1W', risk: 5 },
+                description: "Concentrated exposure to high-momentum sectors. Designed for risk-tolerant investors chasing alpha in volatile markets.",
+                logic: "Short 1-month lookback responds quickly to sector rotation. Minimal risk aversion (γ=0.01) maximizes expected return."
+            },
+            {
+                id: 3,
+                name: "Defensive Yield",
+                subtitle: "Capital preservation first",
+                icon: "Shield",
+                color: "#10b981",
+                riskClass: "risk-conservative",
+                riskLabel: "Conservative",
+                params: { lookback: '12M', rebalance: '1M', risk: 1 },
+                description: "Long-term stability focus with minimal drawdowns. Perfect for wealth preservation and risk-averse portfolios.",
+                logic: "12-month lookback provides stable covariance estimates. High risk aversion (γ=100) prioritizes minimum variance portfolio."
+            },
+            {
+                id: 4,
+                name: "Low Volatility Shield",
+                subtitle: "Smooth ride through turbulence",
+                icon: "Umbrella",
+                color: "#22c55e",
+                riskClass: "risk-moderate",
+                riskLabel: "Low Vol",
+                params: { lookback: '6M', rebalance: '1M', risk: 2 },
+                description: "Targets lowest volatility asset mix. Outperforms in down markets while participating in upside.",
+                logic: "6-month window balances stability with responsiveness. Moderate risk aversion tilts toward low-beta assets."
+            },
+            {
+                id: 5,
+                name: "Risk-On Tactical",
+                subtitle: "Opportunistic growth seeker",
+                icon: "Zap",
+                color: "#f97316",
+                riskClass: "risk-growth",
+                riskLabel: "Growth",
+                params: { lookback: '3M', rebalance: '1W', risk: 4 },
+                description: "Aggressive positioning during favorable conditions. Captures upside momentum with active management.",
+                logic: "3-month lookback identifies emerging trends. Low risk aversion allows concentrated bets on winners."
+            },
+            {
+                id: 6,
+                name: "Risk-Off Hedge Mode",
+                subtitle: "Defensive positioning",
+                icon: "Shield",
+                color: "#06b6d4",
+                riskClass: "risk-conservative",
+                riskLabel: "Defensive",
+                params: { lookback: '6M', rebalance: '2M', risk: 1 },
+                description: "Maximum downside protection. Ideal for uncertain markets or capital preservation mandates.",
+                logic: "Conservative rebalancing reduces transaction costs. Maximum risk aversion seeks global minimum variance."
+            },
+            {
+                id: 7,
+                name: "All-Weather Stability",
+                subtitle: "Perform in any regime",
+                icon: "Layers",
+                color: "#8b5cf6",
+                riskClass: "risk-moderate",
+                riskLabel: "All-Weather",
+                params: { lookback: '6M', rebalance: '1M', risk: 2 },
+                description: "Balanced exposure across market regimes. Consistent returns with manageable volatility in all conditions.",
+                logic: "Blends medium-term signals with stable estimates. Moderate risk creates resilient, diversified allocation."
+            }
+        ];
+
+        // --- MOCK DATA GENERATOR (Aynı kaldı) ---
+        const generateStrategyData = (strategy) => {
+            const curve = [];
+            const benchmarkCurve = [];
+            let val = 100;
+            let spyVal = 100;
+            
+            // Strategy characteristics based on risk
+            const riskLevel = strategy.params.risk;
+            const volatility = 0.008 + (riskLevel * 0.004);
+            const drift = 0.00015 + (riskLevel * 0.00008);
+            const spyDrift = 0.00025;
+            const spyVol_initial = 0.012; 
+            
+            // Generate 756 days (3 years)
+            for (let i = 0; i < 756; i++) {
+                val *= (1 + drift + (Math.random() - 0.48) * volatility);
+                spyVal *= (1 + spyDrift + (Math.random() - 0.48) * spyVol_initial);
+                curve.push(val);
+                benchmarkCurve.push(spyVal);
+            }
+            
+            // Calculate stats
+            const totalRet = ((curve[curve.length-1] - 100) / 100 * 100);
+            const spyRet = ((benchmarkCurve[benchmarkCurve.length-1] - 100) / 100 * 100);
+            const cagr = (Math.pow(curve[curve.length-1]/100, 1/3) - 1) * 100;
+            const spyCagr = (Math.pow(benchmarkCurve[benchmarkCurve.length-1]/100, 1/3) - 1) * 100; 
+            
+            const returns = curve.slice(1).map((v, i) => (v - curve[i]) / curve[i]);
+            const spyReturns = benchmarkCurve.slice(1).map((v, i) => (v - benchmarkCurve[i]) / benchmarkCurve[i]);
+            
+            const weeklyReturns = [];
+            const monthlyReturns = [];
+            
+            for (let i = 5; i < curve.length; i += 5) {
+                weeklyReturns.push((curve[i] - curve[i-5]) / curve[i-5]);
+            }
+            for (let i = 21; i < curve.length; i += 21) {
+                monthlyReturns.push((curve[i] - curve[i-21]) / curve[i-21]);
+            }
+            
+            const avgWeekly = weeklyReturns.reduce((a, b) => a + b, 0) / weeklyReturns.length * 100;
+            const avgMonthly = monthlyReturns.reduce((a, b) => a + b, 0) / monthlyReturns.length * 100;
+            
+            // Volatility Calculations
+            const vol = Math.sqrt(returns.reduce((a, r) => a + r*r, 0) / returns.length) * Math.sqrt(252) * 100;
+            const spyVol = Math.sqrt(spyReturns.reduce((a, r) => a + r*r, 0) / spyReturns.length) * Math.sqrt(252) * 100;
+            
+            const riskFreeRate = 3;
+            // Sharpe Calculations
+            const sharpe = (cagr - riskFreeRate) / vol;
+            const spySharpe = (spyCagr - riskFreeRate) / spyVol; 
+            
+            // Drawdown Calculations
+            let peak = 100, maxDD = 0;
+            let spyPeak = 100, spyMaxDD = 0;
+            let weeklyPeak = 100, maxWeeklyDD = 0;
+            let monthlyPeak = 100, maxMonthlyDD = 0;
+            
+            curve.forEach((p) => {
+                if (p > peak) peak = p;
+                const dd = (peak - p) / peak;
+                if (dd > maxDD) maxDD = dd;
+            });
+
+            benchmarkCurve.forEach((p) => {
+                if (p > spyPeak) spyPeak = p;
+                const dd = (spyPeak - p) / spyPeak;
+                if (dd > spyMaxDD) spyMaxDD = dd;
+            });
+            
+            // Weekly drawdown (unchanged logic)
+            for (let i = 5; i < curve.length; i += 5) {
+                if (curve[i] > weeklyPeak) weeklyPeak = curve[i];
+                const wdd = (weeklyPeak - curve[i]) / weeklyPeak;
+                if (wdd > maxWeeklyDD) maxWeeklyDD = wdd;
+            }
+            
+            // Monthly drawdown (unchanged logic)
+            for (let i = 21; i < curve.length; i += 21) {
+                if (curve[i] > monthlyPeak) monthlyPeak = curve[i];
+                const mdd = (monthlyPeak - curve[i]) / monthlyPeak;
+                if (mdd > maxMonthlyDD) maxMonthlyDD = mdd;
+            }
+            
+            // Composition based on risk level
+            const assets = ['SPY', 'QQQ', 'SMH', 'XLK', 'XLF', 'XLI', 'IWM', 'MDY', 'EFA', 'GLD'];
+            let weights;
+            
+            if (riskLevel <= 2) {
+                weights = [25, 15, 5, 10, 10, 10, 5, 5, 5, 10]; // Conservative
+            } else if (riskLevel === 3) {
+                weights = [20, 20, 10, 15, 8, 8, 7, 5, 4, 3]; // Balanced
+            } else {
+                weights = [15, 25, 20, 18, 5, 5, 7, 3, 2, 0]; // Aggressive
+            }
+            
+            const composition = assets.map((t, i) => ({ t, w: weights[i] }))
+                .filter(c => c.w > 0)
+                .sort((a, b) => b.w - a.w)
+                .slice(0, 5); // Top 5 only
+            
+            return {
+                curve,
+                benchmarkCurve,
+                stats: {
+                    total: totalRet.toFixed(1),
+                    spyTotal: spyRet.toFixed(1),
+                    cagr: cagr.toFixed(1),
+                    spyCagr: spyCagr.toFixed(1), 
+                    weekly: avgWeekly.toFixed(2),
+                    monthly: avgMonthly.toFixed(2),
+                    sharpe: sharpe.toFixed(2),
+                    spySharpe: spySharpe.toFixed(2), 
+                    vol: vol.toFixed(1),
+                    spyVol: spyVol.toFixed(1), 
+                    maxDD: (maxDD * 100).toFixed(1),
+                    spyMaxDD: (spyMaxDD * 100).toFixed(1), 
+                    weeklyDD: (maxWeeklyDD * 100).toFixed(1),
+                    monthlyDD: (maxMonthlyDD * 100).toFixed(1),
+                    winRate: (50 + riskLevel * 3 + Math.random() * 10).toFixed(0)
+                },
+                composition
+            };
+        };
+
+        // --- MINI CHART (Percentage Returns with Y-Axis) ---
+        const MiniChart = ({ curve, benchmarkCurve, color, height = 80 }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                if (!canvasRef.current || !curve || curve.length === 0) return;
+                if (chartRef.current) chartRef.current.destroy();
+
+                // Convert to percentage returns from start
+                const pctCurve = curve.map(v => ((v - 100) / 100) * 100);
+                const pctBenchmark = benchmarkCurve.map(v => ((v - 100) / 100) * 100);
+
+                const ctx = canvasRef.current.getContext('2d');
+                const labels = curve.map((_, i) => i);
+
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                data: pctCurve,
+                                borderColor: color,
+                                borderWidth: 2,
+                                fill: true,
+                                backgroundColor: `${color}20`,
+                                tension: 0.4,
+                                pointRadius: 0
+                            },
+                            {
+                                data: pctBenchmark,
+                                borderColor: '#475569',
+                                borderWidth: 1.5,
+                                borderDash: [4, 4],
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        scales: { 
+                            x: { display: false }, 
+                            y: { 
+                                display: true,
+                                position: 'right',
+                                grid: { 
+                                    color: 'rgba(71, 85, 105, 0.15)',
+                                    drawBorder: false
+                                },
+                                ticks: { 
+                                    color: '#64748b', 
+                                    font: { size: 9 },
+                                    callback: (v) => (v >= 0 ? '+' : '') + v.toFixed(0) + '%',
+                                    maxTicksLimit: 5
+                                }
+                            } 
+                        }
+                    }
+                });
+
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [curve, benchmarkCurve, color]);
+
+            return <canvas ref={canvasRef} style={{ height: `${height}px` }} />;
+        };
+
+        // --- FULL CHART (Percentage Returns) ---
+        const FullChart = ({ curve, benchmarkCurve, color }) => {
+            const canvasRef = useRef(null);
+            const chartRef = useRef(null);
+
+            useEffect(() => {
+                if (!canvasRef.current || !curve || curve.length === 0) return;
+                if (chartRef.current) chartRef.current.destroy();
+
+                // Convert to percentage returns from start
+                const pctCurve = curve.map(v => ((v - 100) / 100) * 100);
+                const pctBenchmark = benchmarkCurve.map(v => ((v - 100) / 100) * 100);
+
+                const ctx = canvasRef.current.getContext('2d');
+                const labels = curve.map((_, i) => i);
+
+                chartRef.current = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: 'Strategy',
+                                data: pctCurve,
+                                borderColor: color,
+                                borderWidth: 2.5,
+                                fill: true,
+                                backgroundColor: `${color}15`,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: 'SPY Benchmark',
+                                data: pctBenchmark,
+                                borderColor: '#64748b',
+                                borderWidth: 2,
+                                borderDash: [6, 4],
+                                fill: false,
+                                tension: 0.3,
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { intersect: false, mode: 'index' },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                align: 'end',
+                                labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                borderColor: 'rgba(71, 85, 105, 0.5)',
+                                borderWidth: 1,
+                                padding: 12,
+                                titleColor: '#e2e8f0',
+                                bodyColor: '#94a3b8',
+                                callbacks: {
+                                    label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(1)}%`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: {
+                                display: true,
+                                position: 'right',
+                                grid: { color: 'rgba(71, 85, 105, 0.15)' },
+                                ticks: { 
+                                    color: '#64748b', 
+                                    font: { size: 10 }, 
+                                    callback: (v) => (v >= 0 ? '+' : '') + v.toFixed(0) + '%'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                return () => { if (chartRef.current) chartRef.current.destroy(); };
+            }, [curve, benchmarkCurve, color]);
+
+            return <canvas ref={canvasRef} />;
+        };
+
+        // --- COMPOSITION BAR (Top 5 Only) ---
+        const CompositionBar = ({ composition }) => {
+            const colors = {
+                'SPY': '#3b82f6', 'QQQ': '#8b5cf6', 'SMH': '#ec4899', 
+                'XLK': '#06b6d4', 'XLF': '#22c55e', 'XLI': '#f59e0b',
+                'IWM': '#ef4444', 'MDY': '#14b8a6', 'EFA': '#a855f7', 'GLD': '#eab308'
+            };
+            
+            const top5 = composition.slice(0, 5);
+            const totalWeight = top5.reduce((sum, item) => sum + item.w, 0);
+
+            return (
+                <div>
+                    <div className="flex h-3 rounded-full overflow-hidden mb-3">
+                        {top5.map((item, i) => (
+                            <div key={i} style={{ width: `${(item.w / totalWeight) * 100}%`, backgroundColor: colors[item.t] || '#64748b' }} title={`${item.t}: ${item.w}%`} />
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                        {top5.map((item, i) => (
+                            <div key={i} className="text-center">
+                                <div className="w-3 h-3 rounded-full mx-auto mb-1" style={{ backgroundColor: colors[item.t] || '#64748b' }} />
+                                <div className="text-xs text-slate-400">{item.t}</div>
+                                <div className="text-sm font-bold text-white">{item.w}%</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- STRATEGY CARD (Enhanced) ---
+        const StrategyCard = ({ strategy, data, onClick }) => {
+            const IconComponent = Icons[strategy.icon] || Icons.Target;
+            const isPositive = parseFloat(data.stats.total) >= 0;
+            const beatsBenchmark = parseFloat(data.stats.total) > parseFloat(data.stats.spyTotal);
+            const top5 = data.composition?.slice(0, 5) || [];
+
+            const etfColors = {
+                'SPY': '#3b82f6', 'QQQ': '#8b5cf6', 'SMH': '#ec4899', 
+                'XLK': '#06b6d4', 'XLF': '#22c55e', 'XLI': '#f59e0b',
+                'IWM': '#ef4444', 'MDY': '#14b8a6', 'EFA': '#a855f7', 'GLD': '#eab308'
+            };
+
+            // Map rebalance period to readable text
+            const frequencyMap = {
+                '1W': 'Weekly',
+                '2W': 'Bi-Weekly', 
+                '1M': 'Monthly',
+                '2M': 'Bi-Monthly',
+                '3M': 'Quarterly',
+                '6M': 'Semi-Annual',
+                '12M': 'Annual'
+            };
+
+            // Risk level colors
+            const riskColors = {
+                1: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.5)', text: '#10b981' },
+                2: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.5)', text: '#22c55e' },
+                3: { bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.5)', text: '#eab308' },
+                4: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.5)', text: '#f97316' },
+                5: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.5)', text: '#ef4444' }
+            };
+
+            const riskStyle = riskColors[strategy.params.risk] || riskColors[3];
+
+            return (
+                <div className="glass-card rounded-xl overflow-hidden cursor-pointer" onClick={onClick}>
+                    {/* Header */}
+                    <div className="p-5 border-b border-slate-700/50">
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="p-2.5 rounded-xl" style={{ backgroundColor: `${strategy.color}20` }}>
+                                <div style={{ color: strategy.color }}><IconComponent /></div>
+                            </div>
+                            
+                            {/* Right side badges - Frequency & Risk */}
+                            <div className="flex gap-2">
+                                <span 
+                                    className="text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                                    style={{ 
+                                        backgroundColor: 'rgba(56, 189, 248, 0.15)', 
+                                        borderColor: 'rgba(56, 189, 248, 0.5)', 
+                                        color: '#38bdf8' 
+                                    }}
+                                >
+                                    {frequencyMap[strategy.params.rebalance]}
+                                </span>
+                                <span 
+                                    className="text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                                    style={{ 
+                                        backgroundColor: riskStyle.bg, 
+                                        borderColor: riskStyle.border, 
+                                        color: riskStyle.text 
+                                    }}
+                                >
+                                    Risk Level: {strategy.params.risk}
+                                </span>
+                            </div>
+                        </div>
+                        <h3 className="text-white font-bold text-xl mb-1">{strategy.name}</h3>
+                        <p className="text-slate-500 text-sm">{strategy.subtitle}</p>
+                    </div>
+
+                    {/* Chart */}
+                    <div className="px-5 py-4 bg-slate-900/30">
+                        {/* Legend */}
+                        <div className="flex items-center justify-end gap-4 mb-2 text-[10px]">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-4 h-0.5 rounded" style={{ backgroundColor: strategy.color }}></div>
+                                <span className="text-slate-400">Strategy</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-4 h-0.5 bg-slate-500 rounded" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #64748b 0, #64748b 4px, transparent 4px, transparent 8px)' }}></div>
+                                <span className="text-slate-400">SPY</span>
+                            </div>
+                        </div>
+                        <div className="h-40">
+                            <MiniChart curve={data.curve} benchmarkCurve={data.benchmarkCurve} color={strategy.color} />
+                        </div>
+                    </div>
+
+                    {/* Key Stats - 4 Column (GÜNCELLENMİŞ BÖLÜM: Sıra ve başlık değişti) */}
+                    <div className="px-5 py-4 border-b border-slate-700/30">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            
+                            {/* 1. CAGR (Yıllık Ortalama Getiri -> Annual Return) */}
+                            <div className="text-center">
+                                <div className="text-[10px] text-slate-500 uppercase mb-1">Annual Return</div>
+                                <div className={`text-lg font-bold ${parseFloat(data.stats.cagr) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    {parseFloat(data.stats.cagr) >= 0 ? '+' : ''}{data.stats.cagr}%
+                                </div>
+                                {/* SPY Karşılaştırması */}
+                                <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.cagr) > parseFloat(data.stats.spyCagr) ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                    SPY: {data.stats.spyCagr}%
+                                </div>
+                            </div>
+
+                            {/* 2. SHARPE RATIO (Riske Ayarlı Getiri) */}
+                            <div className="text-center border-l border-slate-700/50">
+                                <div className="text-[10px] text-slate-500 uppercase mb-1">Sharpe</div>
+                                <div className={`text-lg font-bold ${parseFloat(data.stats.sharpe) >= 1 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                    {data.stats.sharpe}
+                                </div>
+                                {/* SPY Karşılaştırması */}
+                                <div className="text-[9px] text-slate-500 mt-0.5">SPY: {data.stats.spySharpe}</div>
+                            </div>
+                            
+                            {/* 3. MAX DRAWDOWN (Maksimum Düşüş) */}
+                            <div className="text-center border-l border-slate-700/50">
+                                <div className="text-[10px] text-slate-500 uppercase mb-1">Max DD</div>
+                                <div className="text-lg font-bold text-red-400">
+                                    -{data.stats.maxDD}%
+                                </div>
+                                {/* SPY Karşılaştırması */}
+                                <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.maxDD) < parseFloat(data.stats.spyMaxDD) ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    SPY: -{data.stats.spyMaxDD}%
+                                </div>
+                            </div>
+
+                            {/* 4. VOLATILITY (Volatilite) */}
+                            <div className="text-center border-l border-slate-700/50">
+                                <div className="text-[10px] text-slate-500 uppercase mb-1">Volatility</div>
+                                <div className="text-lg font-bold text-slate-300">
+                                    {data.stats.vol}%
+                                </div>
+                                {/* SPY Karşılaştırması */}
+                                <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.vol) < parseFloat(data.stats.spyVol) ? 'text-emerald-400' : 'text-red-400'}`}>
+                                    SPY: {data.stats.spyVol}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {/* (GÜNCELLENMİŞ BÖLÜM SONU) */}
+
+                    {/* Top 5 ETF Composition - Simplified */}
+                    <div className="px-5 py-4">
+                        <div className="text-[10px] text-slate-500 uppercase mb-3">Current Allocation</div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                            {top5.map((item, i) => (
+                                <div key={i} className="flex items-center gap-1.5 text-sm">
+                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: etfColors[item.t] || '#64748b' }} />
+                                    <span className="text-slate-400">{item.t}</span>
+                                    <span className="text-white font-semibold">{item.w}%</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 pb-5">
+                        <button className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium text-slate-300 flex items-center justify-center gap-2 transition-all hover:gap-3">
+                            View Details <Icons.ChevronRight />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- DETAIL MODAL ---
+        const DetailModal = ({ strategy, data, onClose }) => {
+            if (!strategy || !data) return null;
+            
+            const isPositive = parseFloat(data.stats.total) >= 0;
+            const beatsBenchmark = parseFloat(data.stats.total) > parseFloat(data.stats.spyTotal);
+            const IconComponent = Icons[strategy.icon] || Icons.Target;
+
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
+                    <div className="modal-animate glass-card w-full max-w-4xl rounded-2xl overflow-hidden border border-slate-600/50" onClick={e => e.stopPropagation()}>
+                        
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-700/50 bg-gradient-to-r from-slate-900 to-slate-800">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-xl" style={{ backgroundColor: `${strategy.color}20` }}>
+                                        <div style={{ color: strategy.color }}><IconComponent /></div>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <h2 className="text-2xl font-bold text-white">{strategy.name}</h2>
+                                            <span className={`strategy-badge ${strategy.riskClass}`}>{strategy.riskLabel}</span>
+                                        </div>
+                                        <p className="text-slate-400 text-sm">{strategy.description}</p>
+                                    </div>
+                                </div>
+                                <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                                    <Icons.X />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 bg-slate-900/50">
+                            
+                            {/* Performance Header */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <div className="text-xs text-slate-500 uppercase mb-1">Total Return (3Y)</div>
+                                    <div className="flex items-baseline gap-3">
+                                        <span className={`text-4xl font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                            {isPositive ? '+' : ''}{data.stats.total}%
+                                        </span>
+                                        <span className={`text-sm ${beatsBenchmark ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                            ({beatsBenchmark ? '+' : ''}{(parseFloat(data.stats.total) - parseFloat(data.stats.spyTotal)).toFixed(1)}% vs SPY)
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <span className="param-tag text-xs">Lookback: {strategy.params.lookback}</span>
+                                    <span className="param-tag text-xs">Rebalance: {strategy.params.rebalance}</span>
+                                    <span className="param-tag text-xs">Risk Level: {strategy.params.risk}</span>
+                                </div>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="h-64 bg-slate-950/50 rounded-xl border border-slate-800 p-4 mb-6">
+                                <FullChart curve={data.curve} benchmarkCurve={data.benchmarkCurve} color={strategy.color} />
+                            </div>
+
+                            {/* Stats Grid (Modal içi istatistikler) */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                <div className="stat-pill">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">CAGR</div>
+                                    <div className="text-lg font-bold text-white">{data.stats.cagr}%</div>
+                                </div>
+                                <div className="stat-pill">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Sharpe Ratio</div>
+                                    <div className="text-lg font-bold text-white">{data.stats.sharpe}</div>
+                                </div>
+                                <div className="stat-pill">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Volatility</div>
+                                    <div className="text-lg font-bold text-white">{data.stats.vol}%</div>
+                                </div>
+                                <div className="stat-pill">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Max Drawdown</div>
+                                    <div className="text-lg font-bold text-red-400">-{data.stats.maxDD}%</div>
+                                </div>
+                            </div>
+
+                            {/* Return Breakdown */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-3">
+                                        <Icons.BarChart />
+                                        Return &amp; Risk Breakdown
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 text-sm">Avg. Weekly Return</span>
+                                            <span className={`font-medium ${parseFloat(data.stats.weekly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {parseFloat(data.stats.weekly) >= 0 ? '+' : ''}{data.stats.weekly}%
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 text-sm">Avg. Monthly Return</span>
+                                            <span className={`font-medium ${parseFloat(data.stats.monthly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {parseFloat(data.stats.monthly) >= 0 ? '+' : ''}{data.stats.monthly}%
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-t border-slate-700/50 pt-3">
+                                            <span className="text-slate-400 text-sm">Max Weekly Drawdown</span>
+                                            <span className="font-medium text-red-400">-{data.stats.weeklyDD}%</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-400 text-sm">Max Monthly Drawdown</span>
+                                            <span className="font-medium text-red-400">-{data.stats.monthlyDD}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-3">
+                                        <Icons.PieChart />
+                                        Current Allocation
+                                    </div>
+                                    <CompositionBar composition={data.composition} />
+                                </div>
+                            </div>
+
+                            {/* Strategy Logic */}
+                            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                                <div className="text-sm text-white font-medium mb-2">Strategy Logic</div>
+                                <p className="text-slate-400 text-sm leading-relaxed">{strategy.logic}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        const App = () => {
+            const [selectedStrategy, setSelectedStrategy] = useState(null);
+            const [strategiesData, setStrategiesData] = useState({});
+
+            useEffect(() => {
+                // Generate data for all strategies
+                const data = {};
+                STRATEGIES.forEach(s => {
+                    data[s.id] = generateStrategyData(s);
+                });
+                setStrategiesData(data);
+            }, []);
+
+            const selectedData = selectedStrategy ? strategiesData[selectedStrategy.id] : null;
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    {/* Header */}
+                    <div className="max-w-5xl mx-auto mb-8">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl">
+                                <Icons.TrendingUp />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold text-white">ETF Strategy Hub</h1>
+                                <p className="text-slate-500 text-sm">Curated portfolios powered by mean-variance optimization</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Strategy Grid - 2 columns */}
+                    <div className="max-w-5xl mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {STRATEGIES.map(strategy => (
+                                <StrategyCard
+                                    key={strategy.id}
+                                    strategy={strategy}
+                                    data={strategiesData[strategy.id] || { curve: [], benchmarkCurve: [], stats: {}, composition: [] }}
+                                    onClick={() => setSelectedStrategy(strategy)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="max-w-5xl mx-auto mt-10 text-center">
+                        <p className="text-xs text-slate-600">
+                            Navimod Financial Analytics · 3-Year Backtest · 10 Global ETFs · Updated Daily
+                        </p>
+                        <p className="text-xs text-slate-700 mt-1">
+                            For educational purposes only · Past performance does not guarantee future results
+                        </p>
+                    </div>
+
+                    {/* Modal */}
+                    {selectedStrategy && selectedData && (
+                        <DetailModal
+                            strategy={selectedStrategy}
+                            data={selectedData}
+                            onClose={() => setSelectedStrategy(null)}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
