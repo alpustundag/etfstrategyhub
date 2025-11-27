@@ -64,12 +64,32 @@
             text-align: center;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+        /* --- SIDE SHEET ANIMASYONLARI --- */
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0.5; }
+            to { transform: translateX(0); opacity: 1; }
         }
-        .modal-animate {
-            animation: fadeIn 0.2s ease-out;
+
+        .side-sheet-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: flex-end; /* İçeriği sağa yaslar */
+            align-items: stretch; /* Tam boy yapar */
+        }
+
+        .side-sheet-content {
+            width: 100%;
+            max-width: 800px; /* Panelin genişliği */
+            height: 100%;     /* Tam yükseklik */
+            background: #0f172a; /* Slate-950 */
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: -10px 0 25px -5px rgba(0, 0, 0, 0.5);
+            overflow-y: auto; /* Dikey scroll */
+            animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
     </style>
 
@@ -188,21 +208,19 @@
             }
         ];
 
-        // --- MOCK DATA GENERATOR (Aynı kaldı) ---
+        // --- MOCK DATA GENERATOR ---
         const generateStrategyData = (strategy) => {
             const curve = [];
             const benchmarkCurve = [];
             let val = 100;
             let spyVal = 100;
             
-            // Strategy characteristics based on risk
             const riskLevel = strategy.params.risk;
             const volatility = 0.008 + (riskLevel * 0.004);
             const drift = 0.00015 + (riskLevel * 0.00008);
             const spyDrift = 0.00025;
             const spyVol_initial = 0.012; 
             
-            // Generate 756 days (3 years)
             for (let i = 0; i < 756; i++) {
                 val *= (1 + drift + (Math.random() - 0.48) * volatility);
                 spyVal *= (1 + spyDrift + (Math.random() - 0.48) * spyVol_initial);
@@ -210,7 +228,6 @@
                 benchmarkCurve.push(spyVal);
             }
             
-            // Calculate stats
             const totalRet = ((curve[curve.length-1] - 100) / 100 * 100);
             const spyRet = ((benchmarkCurve[benchmarkCurve.length-1] - 100) / 100 * 100);
             const cagr = (Math.pow(curve[curve.length-1]/100, 1/3) - 1) * 100;
@@ -232,16 +249,13 @@
             const avgWeekly = weeklyReturns.reduce((a, b) => a + b, 0) / weeklyReturns.length * 100;
             const avgMonthly = monthlyReturns.reduce((a, b) => a + b, 0) / monthlyReturns.length * 100;
             
-            // Volatility Calculations
             const vol = Math.sqrt(returns.reduce((a, r) => a + r*r, 0) / returns.length) * Math.sqrt(252) * 100;
             const spyVol = Math.sqrt(spyReturns.reduce((a, r) => a + r*r, 0) / spyReturns.length) * Math.sqrt(252) * 100;
             
             const riskFreeRate = 3;
-            // Sharpe Calculations
             const sharpe = (cagr - riskFreeRate) / vol;
             const spySharpe = (spyCagr - riskFreeRate) / spyVol; 
             
-            // Drawdown Calculations
             let peak = 100, maxDD = 0;
             let spyPeak = 100, spyMaxDD = 0;
             let weeklyPeak = 100, maxWeeklyDD = 0;
@@ -259,36 +273,33 @@
                 if (dd > spyMaxDD) spyMaxDD = dd;
             });
             
-            // Weekly drawdown (unchanged logic)
             for (let i = 5; i < curve.length; i += 5) {
                 if (curve[i] > weeklyPeak) weeklyPeak = curve[i];
                 const wdd = (weeklyPeak - curve[i]) / weeklyPeak;
                 if (wdd > maxWeeklyDD) maxWeeklyDD = wdd;
             }
             
-            // Monthly drawdown (unchanged logic)
             for (let i = 21; i < curve.length; i += 21) {
                 if (curve[i] > monthlyPeak) monthlyPeak = curve[i];
                 const mdd = (monthlyPeak - curve[i]) / monthlyPeak;
                 if (mdd > maxMonthlyDD) maxMonthlyDD = mdd;
             }
             
-            // Composition based on risk level
             const assets = ['SPY', 'QQQ', 'SMH', 'XLK', 'XLF', 'XLI', 'IWM', 'MDY', 'EFA', 'GLD'];
             let weights;
             
             if (riskLevel <= 2) {
-                weights = [25, 15, 5, 10, 10, 10, 5, 5, 5, 10]; // Conservative
+                weights = [25, 15, 5, 10, 10, 10, 5, 5, 5, 10]; 
             } else if (riskLevel === 3) {
-                weights = [20, 20, 10, 15, 8, 8, 7, 5, 4, 3]; // Balanced
+                weights = [20, 20, 10, 15, 8, 8, 7, 5, 4, 3]; 
             } else {
-                weights = [15, 25, 20, 18, 5, 5, 7, 3, 2, 0]; // Aggressive
+                weights = [15, 25, 20, 18, 5, 5, 7, 3, 2, 0]; 
             }
             
             const composition = assets.map((t, i) => ({ t, w: weights[i] }))
                 .filter(c => c.w > 0)
                 .sort((a, b) => b.w - a.w)
-                .slice(0, 5); // Top 5 only
+                .slice(0, 5); 
             
             return {
                 curve,
@@ -314,7 +325,7 @@
             };
         };
 
-        // --- MINI CHART (Percentage Returns with Y-Axis) ---
+        // --- MINI CHART ---
         const MiniChart = ({ curve, benchmarkCurve, color, height = 80 }) => {
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
@@ -323,7 +334,6 @@
                 if (!canvasRef.current || !curve || curve.length === 0) return;
                 if (chartRef.current) chartRef.current.destroy();
 
-                // Convert to percentage returns from start
                 const pctCurve = curve.map(v => ((v - 100) / 100) * 100);
                 const pctBenchmark = benchmarkCurve.map(v => ((v - 100) / 100) * 100);
 
@@ -385,7 +395,7 @@
             return <canvas ref={canvasRef} style={{ height: `${height}px` }} />;
         };
 
-        // --- FULL CHART (Percentage Returns) ---
+        // --- FULL CHART ---
         const FullChart = ({ curve, benchmarkCurve, color }) => {
             const canvasRef = useRef(null);
             const chartRef = useRef(null);
@@ -394,7 +404,6 @@
                 if (!canvasRef.current || !curve || curve.length === 0) return;
                 if (chartRef.current) chartRef.current.destroy();
 
-                // Convert to percentage returns from start
                 const pctCurve = curve.map(v => ((v - 100) / 100) * 100);
                 const pctBenchmark = benchmarkCurve.map(v => ((v - 100) / 100) * 100);
 
@@ -473,7 +482,7 @@
             return <canvas ref={canvasRef} />;
         };
 
-        // --- COMPOSITION BAR (Top 5 Only) ---
+        // --- COMPOSITION BAR ---
         const CompositionBar = ({ composition }) => {
             const colors = {
                 'SPY': '#3b82f6', 'QQQ': '#8b5cf6', 'SMH': '#ec4899', 
@@ -504,11 +513,9 @@
             );
         };
 
-        // --- STRATEGY CARD (Enhanced) ---
+        // --- STRATEGY CARD ---
         const StrategyCard = ({ strategy, data, onClick }) => {
             const IconComponent = Icons[strategy.icon] || Icons.Target;
-            const isPositive = parseFloat(data.stats.total) >= 0;
-            const beatsBenchmark = parseFloat(data.stats.total) > parseFloat(data.stats.spyTotal);
             const top5 = data.composition?.slice(0, 5) || [];
 
             const etfColors = {
@@ -517,18 +524,11 @@
                 'IWM': '#ef4444', 'MDY': '#14b8a6', 'EFA': '#a855f7', 'GLD': '#eab308'
             };
 
-            // Map rebalance period to readable text
             const frequencyMap = {
-                '1W': 'Weekly',
-                '2W': 'Bi-Weekly', 
-                '1M': 'Monthly',
-                '2M': 'Bi-Monthly',
-                '3M': 'Quarterly',
-                '6M': 'Semi-Annual',
-                '12M': 'Annual'
+                '1W': 'Weekly', '2W': 'Bi-Weekly', '1M': 'Monthly',
+                '2M': 'Bi-Monthly', '3M': 'Quarterly', '6M': 'Semi-Annual', '12M': 'Annual'
             };
 
-            // Risk level colors
             const riskColors = {
                 1: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.5)', text: '#10b981' },
                 2: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.5)', text: '#22c55e' },
@@ -548,7 +548,6 @@
                                 <div style={{ color: strategy.color }}><IconComponent /></div>
                             </div>
                             
-                            {/* Right side badges - Frequency & Risk */}
                             <div className="flex gap-2">
                                 <span 
                                     className="text-[10px] font-semibold px-2.5 py-1 rounded-full border"
@@ -578,7 +577,6 @@
 
                     {/* Chart */}
                     <div className="px-5 py-4 bg-slate-900/30">
-                        {/* Legend */}
                         <div className="flex items-center justify-end gap-4 mb-2 text-[10px]">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-4 h-0.5 rounded" style={{ backgroundColor: strategy.color }}></div>
@@ -594,60 +592,47 @@
                         </div>
                     </div>
 
-                    {/* Key Stats - 4 Column (GÜNCELLENMİŞ BÖLÜM: Sıra ve başlık değişti) */}
+                    {/* Key Stats */}
                     <div className="px-5 py-4 border-b border-slate-700/30">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            
-                            {/* 1. CAGR (Yıllık Ortalama Getiri -> Annual Return) */}
                             <div className="text-center">
                                 <div className="text-[10px] text-slate-500 uppercase mb-1">Annual Return</div>
                                 <div className={`text-lg font-bold ${parseFloat(data.stats.cagr) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {parseFloat(data.stats.cagr) >= 0 ? '+' : ''}{data.stats.cagr}%
                                 </div>
-                                {/* SPY Karşılaştırması */}
                                 <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.cagr) > parseFloat(data.stats.spyCagr) ? 'text-emerald-400' : 'text-slate-500'}`}>
                                     SPY: {data.stats.spyCagr}%
                                 </div>
                             </div>
-
-                            {/* 2. SHARPE RATIO (Riske Ayarlı Getiri) */}
                             <div className="text-center border-l border-slate-700/50">
                                 <div className="text-[10px] text-slate-500 uppercase mb-1">Sharpe</div>
                                 <div className={`text-lg font-bold ${parseFloat(data.stats.sharpe) >= 1 ? 'text-emerald-400' : 'text-slate-300'}`}>
                                     {data.stats.sharpe}
                                 </div>
-                                {/* SPY Karşılaştırması */}
                                 <div className="text-[9px] text-slate-500 mt-0.5">SPY: {data.stats.spySharpe}</div>
                             </div>
-                            
-                            {/* 3. MAX DRAWDOWN (Maksimum Düşüş) */}
                             <div className="text-center border-l border-slate-700/50">
                                 <div className="text-[10px] text-slate-500 uppercase mb-1">Max DD</div>
                                 <div className="text-lg font-bold text-red-400">
                                     -{data.stats.maxDD}%
                                 </div>
-                                {/* SPY Karşılaştırması */}
                                 <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.maxDD) < parseFloat(data.stats.spyMaxDD) ? 'text-emerald-400' : 'text-red-400'}`}>
                                     SPY: -{data.stats.spyMaxDD}%
                                 </div>
                             </div>
-
-                            {/* 4. VOLATILITY (Volatilite) */}
                             <div className="text-center border-l border-slate-700/50">
                                 <div className="text-[10px] text-slate-500 uppercase mb-1">Volatility</div>
                                 <div className="text-lg font-bold text-slate-300">
                                     {data.stats.vol}%
                                 </div>
-                                {/* SPY Karşılaştırması */}
                                 <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.vol) < parseFloat(data.stats.spyVol) ? 'text-emerald-400' : 'text-red-400'}`}>
                                     SPY: {data.stats.spyVol}%
                                 </div>
                             </div>
                         </div>
                     </div>
-                    {/* (GÜNCELLENMİŞ BÖLÜM SONU) */}
 
-                    {/* Top 5 ETF Composition - Simplified */}
+                    {/* Top 5 ETF Composition */}
                     <div className="px-5 py-4">
                         <div className="text-[10px] text-slate-500 uppercase mb-3">Current Allocation</div>
                         <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -671,7 +656,7 @@
             );
         };
 
-        // --- DETAIL MODAL ---
+        // --- DETAIL MODAL (SIDE SHEET VERSION) ---
         const DetailModal = ({ strategy, data, onClose }) => {
             if (!strategy || !data) return null;
             
@@ -680,11 +665,11 @@
             const IconComponent = Icons[strategy.icon] || Icons.Target;
 
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
-                    <div className="modal-animate glass-card w-full max-w-4xl rounded-2xl overflow-hidden border border-slate-600/50" onClick={e => e.stopPropagation()}>
+                <div className="side-sheet-overlay" onClick={onClose}>
+                    <div className="side-sheet-content" onClick={e => e.stopPropagation()}>
                         
-                        {/* Modal Header */}
-                        <div className="p-6 border-b border-slate-700/50 bg-gradient-to-r from-slate-900 to-slate-800">
+                        {/* Sticky Header */}
+                        <div className="sticky top-0 z-10 p-6 border-b border-slate-700/50 bg-slate-900/95 backdrop-blur-md">
                             <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 rounded-xl" style={{ backgroundColor: `${strategy.color}20` }}>
@@ -698,17 +683,17 @@
                                         <p className="text-slate-400 text-sm">{strategy.description}</p>
                                     </div>
                                 </div>
-                                <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                                <button onClick={onClose} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-slate-700 transition-all">
                                     <Icons.X />
                                 </button>
                             </div>
                         </div>
 
-                        {/* Modal Body */}
-                        <div className="p-6 bg-slate-900/50">
+                        {/* Body */}
+                        <div className="p-6 md:p-8 space-y-8">
                             
                             {/* Performance Header */}
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
                                     <div className="text-xs text-slate-500 uppercase mb-1">Total Return (3Y)</div>
                                     <div className="flex items-baseline gap-3">
@@ -720,7 +705,7 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <span className="param-tag text-xs">Lookback: {strategy.params.lookback}</span>
                                     <span className="param-tag text-xs">Rebalance: {strategy.params.rebalance}</span>
                                     <span className="param-tag text-xs">Risk Level: {strategy.params.risk}</span>
@@ -728,12 +713,12 @@
                             </div>
 
                             {/* Chart */}
-                            <div className="h-64 bg-slate-950/50 rounded-xl border border-slate-800 p-4 mb-6">
+                            <div className="h-72 bg-slate-950/50 rounded-xl border border-slate-800 p-4">
                                 <FullChart curve={data.curve} benchmarkCurve={data.benchmarkCurve} color={strategy.color} />
                             </div>
 
-                            {/* Stats Grid (Modal içi istatistikler) */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <div className="stat-pill">
                                     <div className="text-[10px] text-slate-500 uppercase mb-1">CAGR</div>
                                     <div className="text-lg font-bold text-white">{data.stats.cagr}%</div>
@@ -752,48 +737,48 @@
                                 </div>
                             </div>
 
-                            {/* Return Breakdown */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-3">
-                                        <Icons.BarChart />
-                                        Return &amp; Risk Breakdown
-                                    </div>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-slate-400 text-sm">Avg. Weekly Return</span>
-                                            <span className={`font-medium ${parseFloat(data.stats.weekly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {parseFloat(data.stats.weekly) >= 0 ? '+' : ''}{data.stats.weekly}%
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-slate-400 text-sm">Avg. Monthly Return</span>
-                                            <span className={`font-medium ${parseFloat(data.stats.monthly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                {parseFloat(data.stats.monthly) >= 0 ? '+' : ''}{data.stats.monthly}%
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center border-t border-slate-700/50 pt-3">
-                                            <span className="text-slate-400 text-sm">Max Weekly Drawdown</span>
-                                            <span className="font-medium text-red-400">-{data.stats.weeklyDD}%</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-slate-400 text-sm">Max Monthly Drawdown</span>
-                                            <span className="font-medium text-red-400">-{data.stats.monthlyDD}%</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
-                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-3">
+                            {/* Return Breakdown & Allocation */}
+                            <div className="grid grid-cols-1 gap-6">
+                                <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-4">
                                         <Icons.PieChart />
                                         Current Allocation
                                     </div>
                                     <CompositionBar composition={data.composition} />
                                 </div>
+
+                                <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                                    <div className="flex items-center gap-2 text-sm text-white font-medium mb-4">
+                                        <Icons.BarChart />
+                                        Return &amp; Risk Statistics
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-slate-400 text-xs block mb-1">Avg. Weekly Return</span>
+                                            <span className={`font-medium ${parseFloat(data.stats.weekly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {parseFloat(data.stats.weekly) >= 0 ? '+' : ''}{data.stats.weekly}%
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 text-xs block mb-1">Max Weekly Drawdown</span>
+                                            <span className="font-medium text-red-400">-{data.stats.weeklyDD}%</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 text-xs block mb-1">Avg. Monthly Return</span>
+                                            <span className={`font-medium ${parseFloat(data.stats.monthly) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                {parseFloat(data.stats.monthly) >= 0 ? '+' : ''}{data.stats.monthly}%
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-400 text-xs block mb-1">Max Monthly Drawdown</span>
+                                            <span className="font-medium text-red-400">-{data.stats.monthlyDD}%</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Strategy Logic */}
-                            <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/50">
+                            <div className="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50 pb-8">
                                 <div className="text-sm text-white font-medium mb-2">Strategy Logic</div>
                                 <p className="text-slate-400 text-sm leading-relaxed">{strategy.logic}</p>
                             </div>
@@ -809,7 +794,6 @@
             const [strategiesData, setStrategiesData] = useState({});
 
             useEffect(() => {
-                // Generate data for all strategies
                 const data = {};
                 STRATEGIES.forEach(s => {
                     data[s.id] = generateStrategyData(s);
@@ -834,7 +818,7 @@
                         </div>
                     </div>
 
-                    {/* Strategy Grid - 2 columns */}
+                    {/* Strategy Grid */}
                     <div className="max-w-5xl mx-auto">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {STRATEGIES.map(strategy => (
@@ -858,7 +842,7 @@
                         </p>
                     </div>
 
-                    {/* Modal */}
+                    {/* Detail Modal (Side Sheet) */}
                     {selectedStrategy && selectedData && (
                         <DetailModal
                             strategy={selectedStrategy}
