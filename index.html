@@ -659,10 +659,27 @@
         // --- DETAIL MODAL (SIDE SHEET VERSION) ---
         const DetailModal = ({ strategy, data, onClose }) => {
             if (!strategy || !data) return null;
+
+            // StrategyCard'dan kopyalanan yardımcı nesneler:
+            const frequencyMap = {
+                '1W': 'Weekly', '2W': 'Bi-Weekly', '1M': 'Monthly',
+                '2M': 'Bi-Monthly', '3M': 'Quarterly', '6M': 'Semi-Annual', '12M': 'Annual'
+            };
+
+            const riskColors = {
+                1: { bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.5)', text: '#10b981' },
+                2: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.5)', text: '#22c55e' },
+                3: { bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.5)', text: '#eab308' },
+                4: { bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.5)', text: '#f97316' },
+                5: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.5)', text: '#ef4444' }
+            };
             
             const isPositive = parseFloat(data.stats.total) >= 0;
             const beatsBenchmark = parseFloat(data.stats.total) > parseFloat(data.stats.spyTotal);
             const IconComponent = Icons[strategy.icon] || Icons.Target;
+
+            // Risk stili StrategyCard ile uyumlu hale getirildi
+            const riskStyle = riskColors[strategy.params.risk] || riskColors[3];
 
             return (
                 <div className="side-sheet-overlay" onClick={onClose}>
@@ -705,10 +722,32 @@
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <span className="param-tag text-xs">Lookback: {strategy.params.lookback}</span>
-                                    <span className="param-tag text-xs">Rebalance: {strategy.params.rebalance}</span>
-                                    <span className="param-tag text-xs">Risk Level: {strategy.params.risk}</span>
+                                
+                                {/* BADGE DEĞİŞİKLİĞİ */}
+                                <div className="flex flex-wrap gap-2 justify-end">
+                                    {/* Rebalance Frequency Badge (Weekly) */}
+                                    <span 
+                                        className="text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                                        style={{ 
+                                            backgroundColor: 'rgba(56, 189, 248, 0.15)', 
+                                            borderColor: 'rgba(56, 189, 248, 0.5)', 
+                                            color: '#38bdf8' 
+                                        }}
+                                    >
+                                        {frequencyMap[strategy.params.rebalance]}
+                                    </span>
+                                    {/* Risk Level Badge (Risk Level: 3) */}
+                                    <span 
+                                        className="text-[10px] font-semibold px-2.5 py-1 rounded-full border"
+                                        style={{ 
+                                            backgroundColor: riskStyle.bg, 
+                                            borderColor: riskStyle.border, 
+                                            color: riskStyle.text 
+                                        }}
+                                    >
+                                        Risk Level: {strategy.params.risk}
+                                    </span>
+                                    {/* Lookback Param Tag KALDIRILDI */}
                                 </div>
                             </div>
 
@@ -717,23 +756,42 @@
                                 <FullChart curve={data.curve} benchmarkCurve={data.benchmarkCurve} color={strategy.color} />
                             </div>
 
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="stat-pill">
-                                    <div className="text-[10px] text-slate-500 uppercase mb-1">CAGR</div>
-                                    <div className="text-lg font-bold text-white">{data.stats.cagr}%</div>
+                            {/* Stats Grid (StrategyCard Style) */}
+                            {/* İKİNCİ DEĞİŞİKLİK BURADA YAPILDI: StrategyCard'daki istatistik görünümü kopyalandı */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                                <div className="text-center">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Annual Return</div>
+                                    <div className={`text-lg font-bold ${parseFloat(data.stats.cagr) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {parseFloat(data.stats.cagr) >= 0 ? '+' : ''}{data.stats.cagr}%
+                                    </div>
+                                    <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.cagr) > parseFloat(data.stats.spyCagr) ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                        SPY: {data.stats.spyCagr}%
+                                    </div>
                                 </div>
-                                <div className="stat-pill">
-                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Sharpe Ratio</div>
-                                    <div className="text-lg font-bold text-white">{data.stats.sharpe}</div>
+                                <div className="text-center border-l border-slate-700/50">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Sharpe</div>
+                                    <div className={`text-lg font-bold ${parseFloat(data.stats.sharpe) >= 1 ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                        {data.stats.sharpe}
+                                    </div>
+                                    <div className="text-[9px] text-slate-500 mt-0.5">SPY: {data.stats.spySharpe}</div>
                                 </div>
-                                <div className="stat-pill">
+                                <div className="text-center border-l border-slate-700/50">
+                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Max DD</div>
+                                    <div className="text-lg font-bold text-red-400">
+                                        -{data.stats.maxDD}%
+                                    </div>
+                                    <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.maxDD) < parseFloat(data.stats.spyMaxDD) ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        SPY: -{data.stats.spyMaxDD}%
+                                    </div>
+                                </div>
+                                <div className="text-center border-l border-slate-700/50">
                                     <div className="text-[10px] text-slate-500 uppercase mb-1">Volatility</div>
-                                    <div className="text-lg font-bold text-white">{data.stats.vol}%</div>
-                                </div>
-                                <div className="stat-pill">
-                                    <div className="text-[10px] text-slate-500 uppercase mb-1">Max Drawdown</div>
-                                    <div className="text-lg font-bold text-red-400">-{data.stats.maxDD}%</div>
+                                    <div className="text-lg font-bold text-slate-300">
+                                        {data.stats.vol}%
+                                    </div>
+                                    <div className={`text-[9px] mt-0.5 ${parseFloat(data.stats.vol) < parseFloat(data.stats.spyVol) ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        SPY: {data.stats.spyVol}%
+                                    </div>
                                 </div>
                             </div>
 
@@ -805,18 +863,31 @@
 
             return (
                 <div className="min-h-screen p-4 md:p-8">
-                    {/* Header */}
-                    <div className="max-w-5xl mx-auto mb-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl">
-                                <Icons.TrendingUp />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl md:text-3xl font-bold text-white">ETF Strategy Hub</h1>
-                                <p className="text-slate-500 text-sm">Curated portfolios powered by Navimod Agentic AI Framework</p>
-                            </div>
-                        </div>
-                    </div>
+                   {/* Header Bölümü */}
+<div className="max-w-5xl mx-auto mb-8">
+    <div className="flex items-center gap-3 mb-2">
+        <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl">
+            <Icons.TrendingUp />
+        </div>
+        <div>
+            {/* leading-none: Satır aralığını daraltır */}
+            <h1 className="text-2xl md:text-3xl font-bold text-white leading-none">
+                ETF Strategy Hub
+            </h1>
+            
+            {/* mt-0.5: Çok az bir üst boşluk bırakır (2px) */}
+            {/* text-emerald-400: AI vurgusu için yeşil ton */}
+            <p className="text-slate-500 text-sm mt-1">
+                Strategies powered by Navimod Agentic AI Framework
+            </p>
+            
+            {/* Eski açıklama duracaksa buraya ekleyebilirsiniz, yoksa silebilirsiniz */}
+            <p className="text-slate-500 text-sm mt-1">
+     
+            </p>
+        </div>
+    </div>
+</div>
 
                     {/* Strategy Grid */}
                     <div className="max-w-5xl mx-auto">
@@ -858,5 +929,4 @@
         root.render(<App />);
     </script>
 </body>
-
 </html>
